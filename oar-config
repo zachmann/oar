@@ -1,0 +1,24 @@
+#!/bin/bash
+#title           oar-config
+#description     oar-config is part of the oidc-agent release scripts. It
+#                  provides some common configuration options that are used by
+#                  the other scripts.
+#author		       Gabriel Zachmann
+#date            2020-07-03
+#version         0.1
+#usage		       oar-config should be sourced by the other scripts
+#notes           adapt the settings to your system
+#==============================================================================
+
+# Path to the git repo of the oidc-agent python library
+PY_LIB_PATH="/home/gabriel/Documents/git-repo/liboidcagent"
+# Path to the git repo of the oidc-agent golang library
+GO_LIB_PATH="/home/gabriel/go/src/github.com/zachmann/liboidcagent-go"
+# Path to the git repo of oidc-agent
+AGENT_PATH="/home/gabriel/Documents/git-repo/oidc-agent-par/oidc-agent"
+# Path to a directory where releases are stored
+AGENT_RELEASES_PATH="/home/gabriel/Documents/git-repo/oidc-agent-par/releases"
+# Path to Marcus' cowbuild script update-debian-repo.sh
+UPDATE_DEBIAN_REPO="/home/gabriel/Documents/git-repo/cowbuilder-scripts/update-debian-repo.sh"
+# Path to the agent homebrew repo
+AGENT_HOMEBREW_PATH="/home/gabriel/Documents/git-repo/homebrew-oidc-agent"

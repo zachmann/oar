@@ -1,0 +1,47 @@
+#!/bin/bash
+#title           git-release
+#description     git-release is part of the oidc-agent release scripts. It
+#                  creates a new github release.
+#author		       Gabriel Zachmann
+#date            2020-07-06
+#version         0.1
+#usage		       git-release REPO_OWNER REPO_NAME RELEASE_VERSION RELEASE_TEXT [FILES...]
+#notes           This script requires a github personal access token with repo
+#                 access. The token must be set in the global git config as
+#                 'github.token'
+#==============================================================================
+
+function generate_post_data {
+  cat <<EOF
+{
+  "tag_name": "v$1",
+  "name": "$2",
+  "body": "$3",
+  "draft": false,
+  "prerelease": false
+}
+EOF
+}
+
+function git-release {
+
+owner=$1
+repo=$2
+version=$3
+text=$4
+token=$(git config --global github.token)
+
+name="$repo $version"
+
+output=$(curl -s -H "Authorization: token $token" --data "$(generate_post_data $version $name $text)" "https://api.github.com/repos/${owner}/${repo}/releases")
+echo "Created Release '$name'"
+upload_url=$(echo $output | jq -r '.upload_url')
+upload_url=${upload_url/%\{?name,label\}/}
+
+for file in "${@:5}"; do
+  curl -s -H "Authorization: token $token" -H "Content-Type: $(file -b --mime-type $file)" --data-binary "@$file" ${upload_url}?name=$(basename $file) >/dev/null
+  echo "Uploaded file '$file'."
+done
+echo "Done"
+
+}

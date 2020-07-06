@@ -1,0 +1,72 @@
+#!/bin/bash
+#title           oar-utils
+#description     oar-utils is part of the oidc-agent release scripts. It
+#                  provides some common functionality for the other scripts.
+#author		       Gabriel Zachmann
+#date            2020-07-03
+#version         0.1
+#usage		       oar-utils should be sourced by the other scripts
+#notes           
+#==============================================================================
+
+source $(dirname $0)/oar-config
+
+function move_topdir {
+  cd `git rev-parse --show-toplevel` # ensure we are in the top level directory
+}
+
+function move_agent_gitrepo {
+  if [ -z $AGENT_PATH ]; then
+    move_topdir
+  else
+    cd $AGENT_PATH
+  fi
+}
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+ORANGE='\033[0;33m'
+BLUE='\033[0;34m'
+PURPLE='\033[0;35m'
+CYAN='\033[0;36m'
+NC='\033[0m' # No Color
+
+function echo_green {
+  printf "$GREEN$1$NC\n"
+}
+
+function echo_red {
+  printf "$RED$1$NC\n"
+}
+
+function echo_orange {
+  printf "$ORANGE$1$NC\n"
+}
+
+function prompt {
+  if [ -z ${2+x} ]; then
+    read -e -p "[36m${1}:[0m " input
+  else
+    read -e -i $2 -p "[36m${1}:[0m " input
+  fi
+}
+
+function box_out {
+  local s=("$@") b w
+  for l in "${s[@]}"; do
+    ((w<${#l})) && { b="$l"; w="${#l}"; }
+  done
+  tput setaf 3
+  echo " -${b//?/-}-
+| ${b//?/ } |"
+  for l in "${s[@]}"; do
+    printf '| %*s |\n' "-$w" "$l"
+  done
+  echo "| ${b//?/ } |
+ -${b//?/-}-"
+  tput sgr 0
+}
+
+function echo_important {
+  box_out "$@"
+}

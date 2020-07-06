@@ -1,0 +1,99 @@
+#!/bin/bash
+#title           oar-prepare
+#description     oar-prepare is part of the oidc-agent release scripts. It
+#                  should prepare a release on the local system; this includes 
+#                  checking the version, changelog, rpm spec file.
+#author		       Gabriel Zachmann
+#date            2020-07-03
+#version         0.1
+#usage		       oar-prepare [version]
+#notes           
+#==============================================================================
+
+
+source $(dirname $0)/oar-utils
+
+move_agent_gitrepo # ensure we are in the top level directory of the agent git repo
+
+version_c=$1
+version_f=$(cat VERSION)
+
+function comp_versions {
+  if [ "$version_c" = "$version_f" ]; then
+    echo_green "Specified version is the same as in the version file."
+    version=$version_c
+    echo "Using version ${version}."
+  else
+    echo_red "Specified version '$version_c' differs from version '$version_f' in the version
+    file."
+    prompt "Please enter the version to use" $version_c
+    version=$input
+    echo "Using version ${version}."
+    if [ "$version" != "$version_f" ]; then
+      echo_orange "Updating version file to '${version}'"
+      echo ${version} > VERSION
+    fi
+  fi
+}
+
+function check_version {
+  if [ -z $version_c ]; then
+    echo "Using version '${version_f}' from the version file."
+    version=$version_f
+  else
+    comp_versions
+  fi
+  echo_green "* We have the new version number."
+}
+
+function update_rpm_specfile {
+  make update_oidc-agent_spec
+  echo_green "* Updated RPM oidc-agent.spec file."
+}
+
+function dateToChangelogDate {
+  date=$(date +"%a, %d %b %Y %H:%M:%S %z")
+}
+
+function getNewChangelogLine {
+  dateToChangelogDate
+  tail debian/changelog -n1 | awk -v date="$date" -F\> '{print $1">  " date}'
+}
+
+function updateDateInChangelog {
+  sed -i '$s/.*/'"$(getNewChangelogLine)"'/' debian/changelog
+}
+
+function printLastChangelogEntry {
+  tac debian/changelog | sed '/\[ .* \]/q' | tac | head -n-2
+}
+
+function update_debian_changelog {
+  make update_dch_version
+  echo_green "* Updated version in debian changelog."
+  readarray -t lines <<<"$(printLastChangelogEntry)"
+  echo_orange "This is the the last entry in the debian changelog:" 
+  echo_important "${lines[@]}"
+  while true; do
+    prompt "Do you want to add something? [n/y]"
+    if [ "$input" == "y" ]; then
+      updateDateInChangelog
+      echo_green "* Updated date in debian changelog."
+      vim --noplugin debian/changelog
+      break
+    else
+      if [ "$input" == "n" ]; then
+        break
+      fi
+    fi
+  done
+}
+
+
+check_version
+update_rpm_specfile
+update_debian_changelog
+echo_orange "* You should run 'make deb' to check that the debian package builds
+correctly."
+echo_important "We most likely changed files. Don't forget to commit these!"
+echo_important "If everything is on 'master', proceed with 'oar-build $version'"

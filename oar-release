@@ -1,0 +1,102 @@
+#!/bin/bash
+#title           oar-release
+#description     oar-release is part of the oidc-agent release scripts. It
+#                  should help with releasing the artefacts for different
+#                  targets.
+#author		       Gabriel Zachmann
+#date            2020-07-06
+#version         0.1
+#usage		       oar-release version [target]
+#notes           default target are all agent releases (not library)
+#                possible targets are:
+#                 deb
+#                 rpm
+#                 py
+#                 go
+#                 macos
+#                 github
+#==============================================================================
+
+source $(dirname $0)/oar-utils
+source $(dirname $0)/git-release
+
+version_c=$1
+target=$2
+
+function release_pythonlib {
+  pushd $PY_LIB_PATH
+  twine upload dist/*${version_c}*
+  popd
+  echo_green "Python library released."
+}
+
+function release_golib {
+  echo_important "Go to '$GOLIB_PATH' and commit and push unreleased changes."
+}
+
+function release_macos {
+  pushd $AGENT_HOMEBREW_PATH
+  ./updateToRelease.sh $version_c
+  git add oidc-agent.rb
+  git commit -m "$version_c"
+  git push
+  popd
+  echo_green "MACOS version '$version_c' released."
+}
+
+function release_debian {
+  echo "Releasing Debian Packages"
+  ssh build@repo.data.kit.edu "/home/build/cowbuilder-scripts/publish-oidc.sh ${version_c}"
+  echo "** Copied packages to web server."
+  PACKAGE_PATH="${AGENT_RELEASES_PATH}/${version_c}"
+  mkdir -p $PACKAGE_PATH
+  scp -r build@repo.data.kit.edu:github $PACKAGE_PATH
+  echo "** Copied packages to local archive."
+  $UPDATE_DEBIAN_REPO $version_c 
+  echo "** Updated Release file of repo."
+  echo_green "Released Debian Packages."
+}
+
+function release_rpm {
+  echo_important "Upload RPM Package to GitHub Release or use target 'github' to release rpm on GitHub"
+}
+
+function release_github {
+  PACKAGE_PATH="${AGENT_RELEASES_PATH}/${version_c}"
+  echo "* Releasing oidc-agent $version_c on GitHub."
+  git-release indigo-dc oidc-agent $version_c $(ls ${PACKAGE_PATH}/*.rpm)
+  echo_green "Released oidc-agent $version_c on GitHub."
+  echo_green "Released RPM Package of oidc-agent $version_c on GitHub."
+}
+
+
+if [ -z $target ]; then
+  release_debian
+  release_github # This includes rpm
+  release_macos # This must run after github
+  exit
+fi
+
+case $target in
+  deb)
+    release_debian
+    ;;
+  rpm)
+    release_rpm
+    ;;
+  github)
+    release_github
+    ;;
+  macos)
+    release_macos
+    ;;
+  go)
+    release_golib
+    ;;
+  py)
+    release_pythonlib
+    ;;
+  *)
+    echo_red "Unknown target"
+    ;;
+esac

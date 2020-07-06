@@ -1,0 +1,111 @@
+#!/bin/bash
+#title           oar-build
+#description     oar-build is part of the oidc-agent release scripts. It
+#                  should help with building the release packages for different
+#                  targets.
+#author		       Gabriel Zachmann
+#date            2020-07-03
+#version         0.1
+#usage		       oar-build version [target]
+#notes           default target is deb and rpm
+#                possible targets are:
+#                 deb
+#                 rpm
+#                 py
+#                 go
+#==============================================================================
+
+
+source $(dirname $0)/oar-utils
+
+# move_topdir # ensure we are in the top level directory
+
+version_c=$1
+target=$2
+
+function assert_versions_equal {
+  if [ "$version_c" != "$1" ]; then
+    echo_red "Passed version does not match the version in the version file."
+    exit 1
+  fi
+}
+
+function build_debian {
+  ssh build@repo.data.kit.edu "/home/build/cowbuilder-scripts/cow-build-oidc-all.sh $version_c"
+  if [ $? -eq 0 ]; then 
+    echo_green "* Build debian packages on repo.data.kit.edu"
+  else
+    echo_red "Something went wrong. Try building package on repo.data.kit.edu!"
+  fi
+}
+
+function build_rpm {
+  echo "* Building RPM"
+  if [ -d "/tmp/oidc-agent-rpm" ]; then
+    echo "** Removing existing tmp directory"
+    sudo rm -rf /tmp/oidc-agent-rpm
+  fi
+  echo "** Cloning to /tmp/oidc-agent-rpm"
+  git clone https://github.com/indigo-dc/oidc-agent /tmp/oidc-agent-rpm >/dev/null
+  assert_versions_equal "$(cat /tmp/oidc-agent-rpm/VERSION)"
+  echo "** Creating docker script"
+  echo "#!/bin/sh" >/tmp/oidc-agent-rpm/docker-run
+  echo "cd tmp/" >>/tmp/oidc-agent-rpm/docker-run
+  echo "make rpm" >>/tmp/oidc-agent-rpm/docker-run
+  chmod +x /tmp/oidc-agent-rpm/docker-run
+  echo "mv ../oidc-agent-${version_c}-1.el7.x86_64.rpm ./" >>/tmp/oidc-agent-rpm/docker-run
+  echo "** Starting docker container"
+  docker run -v /tmp/oidc-agent-rpm:/tmp -ti --network host indigodatacloud/ci-images:bcentos7 /tmp/docker-run
+  echo "** Moving rpm package to oidc-agent build directory"
+  PACKAGE_PATH="${AGENT_RELEASES_PATH}/${version_c}"
+  mkdir -p $PACKAGE_PATH
+  mv /tmp/oidc-agent-rpm/oidc-agent-${version_c}-1.el7.x86_64.rpm $PACKAGE_PATH
+  echo "** Cleaning up"
+  sudo rm -rf /tmp/oidc-agent-rpm
+  echo_green "* Build RPM package. Package is at '$PACKAGE_PATH'"
+}
+
+function build_pythonlib {
+  pushd $PY_LIB_PATH >/dev/null
+  echo "* Building Python library"
+  py_vers=$(grep "__version__" liboidcagent/__init__.py | cut -d\' -f2)
+  if [ "$version_c" != $py_vers ]; then
+    echo_red "Passed version '$version_c' differs from version of python library '$py_vers'."
+    echo_important "Please pass correct version or change 'liboidcagent/__init__.py'"
+    return 1
+  fi
+  python setup.py sdist bdist_wheel >/dev/null
+  python3 setup.py bdist_wheel >/dev/null
+  twine check dist/*${version_c}* >/dev/null
+  popd >/dev/null
+  echo_green "* Python builds are in dist directory."
+}
+
+function build_golib {
+  echo_green "* Go library does not need to be built."
+}
+
+
+if [ -z $target ]; then
+  build_debian
+  build_rpm
+  exit
+fi
+
+case $target in
+  deb)
+    build_debian
+    ;;
+  rpm)
+    build_rpm
+    ;;
+  go)
+    build_golib
+    ;;
+  py)
+    build_pythonlib
+    ;;
+  *)
+    echo_red "Unknown target"
+    ;;
+esac
