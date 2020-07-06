@@ -20,6 +20,8 @@
 source $(dirname $0)/oar-utils
 source $(dirname $0)/git-release
 
+move_agent_gitrepo # ensure we are in the top level directory of the agent git repo
+
 version_c=$1
 target=$2
 
@@ -47,10 +49,14 @@ function release_macos {
 function release_debian {
   echo "Releasing Debian Packages"
   ssh build@repo.data.kit.edu "/home/build/cowbuilder-scripts/publish-oidc.sh ${version_c}"
+  if [ $? -ne 0 ]; then
+    echo_red "Could not release Debian Packages"
+    return 1
+  fi
   echo "** Copied packages to web server."
   PACKAGE_PATH="${AGENT_RELEASES_PATH}/${version_c}"
   mkdir -p $PACKAGE_PATH
-  scp -r build@repo.data.kit.edu:github $PACKAGE_PATH
+  scp -r build@repo.data.kit.edu:github/*.deb $PACKAGE_PATH
   echo "** Copied packages to local archive."
   $UPDATE_DEBIAN_REPO $version_c 
   echo "** Updated Release file of repo."
@@ -61,10 +67,43 @@ function release_rpm {
   echo_important "Upload RPM Package to GitHub Release or use target 'github' to release rpm on GitHub"
 }
 
+function createGitHubReleaseNotesFromDebianChangelog {
+  preparedLines=$(printLastChangelogEntry | tac | head -n-1 | tac | sed 's/^ *\*/-/')
+  (
+    echo "<!-- Release Notes for oidc-agent $version -->"
+    echo "<!-- The content of this file was created based on the debian changelog. -->"
+    echo "<!-- Please adapt the different points, add, and remove points as needed. -->"
+    echo "<!-- When done, save the file and close it. -->"
+    echo
+    echo
+    echo "$preparedLines" | grep -iv "^- *fix"
+    echo
+    echo "## Features"
+    echo
+    echo "## API"
+    echo
+    echo "## Enhancements"
+    echo
+    echo "## Bugfixes"
+    echo "$preparedLines" | grep -i "^- *fix"
+    echo
+    echo "## OpenID Provider"
+    echo
+    echo "## Dependencies"
+    echo
+  )>/tmp/github-release-notes.md
+}
+
 function release_github {
   PACKAGE_PATH="${AGENT_RELEASES_PATH}/${version_c}"
   echo "* Releasing oidc-agent $version_c on GitHub."
-  git-release indigo-dc oidc-agent $version_c $(ls ${PACKAGE_PATH}/*.rpm)
+  echo "** Creating release notes."
+  createGitHubReleaseNotesFromDebianChangelog
+  vim --noplugin /tmp/github-release-notes.md
+  vim +':%s/^##.*\n\(^$\)\+//g' +':%s/^$\n^$//g' +:x /tmp/github-release-notes.md
+  git-release indigo-dc oidc-agent $version_c "$(cat /tmp/github-release-notes.md)" $(ls ${PACKAGE_PATH}/*.rpm)
+  echo "** Cleaning up release notes."
+  rm /tmp/github-release-notes.md
   echo_green "Released oidc-agent $version_c on GitHub."
   echo_green "Released RPM Package of oidc-agent $version_c on GitHub."
 }

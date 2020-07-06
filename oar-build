@@ -89,6 +89,7 @@ function build_golib {
 if [ -z $target ]; then
   build_debian
   build_rpm
+  echo_important "If everything is fine, proceed with 'oar-release $version_c'"
   exit
 fi
 
@@ -109,3 +110,4 @@ case $target in
     echo_red "Unknown target"
     ;;
 esac
+echo_important "If everything is fine, proceed with 'oar-release $version_c $target'" "or build another target."

@@ -70,3 +70,7 @@ function box_out {
 function echo_important {
   box_out "$@"
 }
+
+function printLastChangelogEntry {
+  tac debian/changelog | sed '/\[ .* \]/q' | tac | head -n-2
+}

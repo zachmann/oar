@@ -33,7 +33,7 @@ token=$(git config --global github.token)
 
 name="$repo $version"
 
-output=$(curl -s -H "Authorization: token $token" --data "$(generate_post_data $version $name $text)" "https://api.github.com/repos/${owner}/${repo}/releases")
+output=$(curl -s -H "Authorization: token $token" --data "$(generate_post_data "$version" "$name" "$text")" "https://api.github.com/repos/${owner}/${repo}/releases")
 echo "Created Release '$name'"
 upload_url=$(echo $output | jq -r '.upload_url')
 upload_url=${upload_url/%\{?name,label\}/}

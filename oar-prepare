@@ -64,9 +64,6 @@ function updateDateInChangelog {
   sed -i '$s/.*/'"$(getNewChangelogLine)"'/' debian/changelog
 }
 
-function printLastChangelogEntry {
-  tac debian/changelog | sed '/\[ .* \]/q' | tac | head -n-2
-}
 
 function update_debian_changelog {
   make update_dch_version
