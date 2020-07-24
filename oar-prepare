@@ -86,8 +86,22 @@ function update_debian_changelog {
   done
 }
 
+#TODO
+
+# check_docu_gen {
+#
+# }
+
+function check_docu {
+  check_docu_gen
+  check_docu_add
+  check_docu_agent
+  check_docu_token
+}
+
 
 check_version
+# check_docu
 update_rpm_specfile
 update_debian_changelog
 echo_orange "* You should run 'make deb' to check that the debian package builds

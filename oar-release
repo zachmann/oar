@@ -101,9 +101,14 @@ function release_github {
   createGitHubReleaseNotesFromDebianChangelog
   vim --noplugin /tmp/github-release-notes.md
   vim +':%s/^##.*\n\(^$\)\+//g' +':%s/^$\n^$//g' +:x /tmp/github-release-notes.md
-  git-release indigo-dc oidc-agent $version_c "$(cat /tmp/github-release-notes.md)" $(ls ${PACKAGE_PATH}/*.rpm)
+  git-release indigo-dc oidc-agent $version_c "$(awk '{printf "%s\\n", $0}' /tmp/github-release-notes.md)" $(ls ${PACKAGE_PATH}/*.rpm)
+  success=$?
   echo "** Cleaning up release notes."
   rm /tmp/github-release-notes.md
+  if [ $success -ne 0 ]; then
+    echo_red "GitHub Upload failed!"
+    return 1
+  fi
   echo_green "Released oidc-agent $version_c on GitHub."
   echo_green "Released RPM Package of oidc-agent $version_c on GitHub."
 }
@@ -112,7 +117,9 @@ function release_github {
 if [ -z $target ]; then
   release_debian
   release_github # This includes rpm
-  release_macos # This must run after github
+  if [ $? -eq 0 ]; then
+    release_macos # This must run after github
+  fi
   exit
 fi
 
